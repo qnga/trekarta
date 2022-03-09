@@ -133,12 +133,10 @@ public class NavigationService extends BaseNavigationService implements OnShared
             navigateTo(mo);
         }
         if (action.equals(NAVIGATE_ROUTE)) {
-            int index = extras.getInt(EXTRA_ROUTE_INDEX);
-            int dir = extras.getInt(EXTRA_ROUTE_DIRECTION, DIRECTION_FORWARD);
-            int start = extras.getInt(EXTRA_ROUTE_START, -1);
-            Route route = null; //application.getRoute(index);
+            int dir = extras != null ? extras.getInt(EXTRA_ROUTE_DIRECTION, DIRECTION_FORWARD) : DIRECTION_FORWARD;
+            int start = extras != null ? extras.getInt(EXTRA_ROUTE_START, -1) : -1;
+            Route route = MapTrek.getApplication().getNavigatedRoute();
             //TODO Reimplement route navigation
-            //noinspection ConstantConditions
             if (route == null)
                 return START_NOT_STICKY;
             navigateTo(route, dir);
@@ -368,8 +366,10 @@ public class NavigationService extends BaseNavigationService implements OnShared
         navDirection = direction;
         navCurrentRoutePoint = navDirection == 1 ? 1 : navRoute.length() - 2;
 
-        //navWaypoint = navRoute.getWaypoint(navCurrentRoutePoint);
-        //prevWaypoint = navRoute.getWaypoint(navCurrentRoutePoint - navDirection);
+        Route.Instruction to = navRoute.get(navCurrentRoutePoint);
+        Route.Instruction from = navRoute.get(navCurrentRoutePoint - navDirection);
+        navWaypoint = new MapObject(to.getText(), to.getCoordinates());
+        prevWaypoint = new MapObject(from.getText(), from.getCoordinates());
         navProximity = navWaypoint.proximity > 0 ? navWaypoint.proximity : mRouteProximity;
         navRouteDistance = -1;
         navCourse = prevWaypoint.coordinates.bearingTo(navWaypoint.coordinates);

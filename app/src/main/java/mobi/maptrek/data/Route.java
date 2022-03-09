@@ -35,6 +35,7 @@ public class Route {
     public int width;
 
     public double distance;
+    public long time;
     public boolean removed = false;
     private BoundingBox mBox = null;
 
@@ -57,11 +58,23 @@ public class Route {
     }
 
     public void addInstruction(int latitudeE6, int longitudeE6) {
-        addInstruction(new GeoPoint(latitudeE6, longitudeE6));
+        addInstruction(latitudeE6, longitudeE6, null);
+    }
+
+    public void addInstruction(int latitudeE6, int longitudeE6, String text) {
+        addInstruction(new GeoPoint(latitudeE6, longitudeE6), text);
     }
 
     public void addInstruction(GeoPoint point) {
-        Instruction instruction = new Instruction(point);
+        addInstruction(point, null);
+    }
+
+    public void addInstruction(GeoPoint point, String text) {
+        addInstruction(point, text, Instruction.UNDEFINED);
+    }
+
+    public void addInstruction(GeoPoint point, String text, int sign) {
+        Instruction instruction = new Instruction(point, text, sign);
         addInstruction(instruction);
     }
 
@@ -75,7 +88,7 @@ public class Route {
     }
 
     public void insertInstruction(GeoPoint point) {
-        Instruction instruction = new Instruction(point);
+        Instruction instruction = new Instruction(point, null);
         insertInstruction(instruction);
     }
 
@@ -338,9 +351,16 @@ public class Route {
         private int sign;
         private int distance; // TODO Use distance if set
 
-        Instruction(GeoPoint point) {
+        Instruction(GeoPoint point, String text) {
             super(point.latitudeE6, point.longitudeE6);
+            this.text = text;
             sign = UNDEFINED;
+        }
+
+        Instruction(GeoPoint point, String text, int sign) {
+            super(point.latitudeE6, point.longitudeE6);
+            this.text = text;
+            this.sign = sign;
         }
 
         public GeoPoint getCoordinates() {

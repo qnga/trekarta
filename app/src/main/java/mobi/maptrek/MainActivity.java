@@ -48,6 +48,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.VectorDrawable;
 import android.location.Location;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -99,6 +101,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.greenrobot.eventbus.Subscribe;
+import org.json.JSONException;
 import org.oscim.android.canvas.AndroidBitmap;
 import org.oscim.backend.CanvasAdapter;
 import org.oscim.backend.canvas.Bitmap;
@@ -3843,6 +3846,7 @@ public class MainActivity extends BasePluginActivity implements ILocationListene
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         //noinspection SwitchStatementWithTooFewBranches
         switch (requestCode) {
             case PERMISSIONS_REQUEST_FINE_LOCATION: {
@@ -4249,16 +4253,22 @@ public class MainActivity extends BasePluginActivity implements ILocationListene
             HelperUtils.showError(message, mViews.coordinatorLayout);
             return;
         }
-        double distance = resultData.getDouble("distance");
-        long time = resultData.getLong("time");
-        String poly = resultData.getString("points");
-        HelperUtils.showError(distance + " " + time, mViews.coordinatorLayout);
-        if (poly != null) {
-            Track track = new Track();
-            ArrayList<GeoPoint> points = GraphHopperService.decodePolyline(poly, 0, false);
-            for (GeoPoint point : points)
-                track.addPointFast(true, point.latitudeE6, point.longitudeE6, 0f, 0f, 0f, 0f, 0L);
+        String json = resultData.getString("json");
+        try {
+            Pair<Route, Track> result = GraphHopperService.getRoute(json);
+            Route route = result.first;
+            Track track = result.second;
+            //HelperUtils.showError(route.distance + " " + route.time, mViews.coordinatorLayout);
             mMap.layers().add(new TrackLayer(mMap, track));
+            mMap.layers().add(new RouteLayer(mMap, route));
+            MapTrek.getApplication().setNavigatedRoute(route);
+            enableNavigation();
+            Intent i = new Intent(this, NavigationService.class).setAction(NavigationService.NAVIGATE_ROUTE);
+            startService(i);
+            if (mLocationState == LocationState.DISABLED)
+                askForPermission();
+        } catch (JSONException e) {
+            HelperUtils.showError(e.getMessage(), mViews.coordinatorLayout);
         }
     }
 
@@ -4460,15 +4470,11 @@ public class MainActivity extends BasePluginActivity implements ILocationListene
     }
 
     public boolean isOnline() {
-        // FIXME temporary
-        return false;
-        /*
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (cm == null)
             return false;
         NetworkInfo netInfo = cm.getActiveNetworkInfo();
         return netInfo != null && netInfo.isConnected();
-        */
     }
 
     @Override

@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.os.ResultReceiver;
 import android.util.Log;
+import android.util.Pair;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,6 +32,8 @@ import org.oscim.core.GeoPoint;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import mobi.maptrek.data.Route;
+import mobi.maptrek.data.Track;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -56,7 +59,7 @@ public class GraphHopperService extends IntentService {
                 .host("graphhopper.com")
                 .addPathSegments("api/1/route")
                 .addQueryParameter("key", "71856f01-9df7-41dc-89eb-7e0de877c059")
-                .addQueryParameter("locale", "de")
+                .addQueryParameter("locale", "ru")
                 .addQueryParameter("vehicle", "car");
         if (points != null) {
             for (int i = 0; i < points.length; i += 2) {
@@ -64,6 +67,7 @@ public class GraphHopperService extends IntentService {
             }
         }
         Request request = new Request.Builder().url(urlBuilder.build()).get().build();
+        Log.e("GHR", request.toString());
 
         Bundle bundle = new Bundle();
         bundle.putDoubleArray(EXTRA_POINTS, points);
@@ -72,16 +76,12 @@ public class GraphHopperService extends IntentService {
             ResponseBody body = response.body();
             if (body != null) {
                 String json = body.string();
-                JSONObject jsonObject = new JSONObject(json);
                 body.close();
                 if (response.isSuccessful()) {
-                    JSONArray paths = jsonObject.getJSONArray("paths");
-                    JSONObject path = paths.getJSONObject(0);
-                    bundle.putDouble("distance", path.getDouble("distance"));
-                    bundle.putLong("time", path.getLong("time") / 1000); // convert to seconds
-                    bundle.putString("points", path.getString("points"));
+                    bundle.putString("json", json);
                     receiver.send(1, bundle);
                 } else {
+                    JSONObject jsonObject = new JSONObject(json);
                     bundle.putString("message", jsonObject.getString("message"));
                     receiver.send(0, bundle);
                     JSONArray hints = jsonObject.getJSONArray("hints");
@@ -95,6 +95,44 @@ public class GraphHopperService extends IntentService {
             bundle.putString("message", e.getMessage());
             receiver.send(0, bundle);
         }
+    }
+
+    public static Pair<Route, Track> getRoute(String json) throws JSONException {
+        JSONObject jsonObject = new JSONObject(json);
+        JSONArray paths = jsonObject.getJSONArray("paths");
+        JSONObject path = paths.getJSONObject(0);
+        Route route = new Route();
+        Track track = new Track();
+
+        // decode track
+        String poly = path.getString("points");
+        ArrayList<GeoPoint> points = GraphHopperService.decodePolyline(poly, 0, false);
+        for (GeoPoint point : points)
+            track.addPointFast(true, point.latitudeE6, point.longitudeE6, 0f, 0f, 0f, 0f, 0L);
+
+        // decode route
+        JSONArray instructions = path.getJSONArray("instructions");
+        for (int i = 0; i < instructions.length(); i++) {
+            /* {
+              "distance": 2612.617,
+              "heading": 329.58,
+              "sign": 0,
+              "interval": [0, 18],
+              "text": "Dem Straßenverlauf von Парашютная улица folgen",
+              "time": 238175,
+              "street_name": "Парашютная улица"
+            } */
+            JSONObject instruction = instructions.getJSONObject(i);
+            JSONArray interval = instruction.getJSONArray("interval");
+            int from = interval.getInt(0);
+            int to = interval.getInt(1);
+            GeoPoint point = track.points.get(from);
+            int sign = instruction.optInt("sign", Route.Instruction.UNDEFINED);
+            String text = instruction.optString("text", null);
+            route.addInstruction(point, text, sign);
+        }
+        route.time = path.getLong("time") / 1000; // convert to seconds
+        return new Pair<>(route, track);
     }
 
     /**

@@ -62,6 +62,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import mobi.maptrek.data.MapObject;
+import mobi.maptrek.data.Route;
 import mobi.maptrek.data.Waypoint;
 import mobi.maptrek.data.source.WaypointDbDataSource;
 import mobi.maptrek.maps.MapFile;
@@ -105,6 +106,7 @@ public class MapTrek extends Application {
     private File mSDCardDirectory;
     private SafeResultReceiver mResultReceiver;
     private Waypoint mEditedWaypoint;
+    private Route mNavigatedRoute;
     private List<MapFile> mBitmapLayerMaps;
 
     private static final LongSparseArray<MapObject> mapObjects = new LongSparseArray<>();
@@ -389,6 +391,14 @@ public class MapTrek extends Application {
 
     public void setEditedWaypoint(Waypoint waypoint) {
         mEditedWaypoint = waypoint;
+    }
+
+    public Route getNavigatedRoute() {
+        return mNavigatedRoute;
+    }
+
+    public void setNavigatedRoute(Route route) {
+        mNavigatedRoute = route;
     }
 
     @Nullable
